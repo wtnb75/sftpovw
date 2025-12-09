@@ -12,7 +12,9 @@ class TestFS(unittest.TestCase):
         tf.write(b"hello world")
         tf.flush()
         res = FS.hash_local([Path(tf.name)])
-        self.assertEqual(["2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"], list(res.values()))
+        self.assertEqual(
+            ["2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"], list(res.values())
+        )
 
     def test_put_safeN(self):
         with SFTPContainer() as sftp:
