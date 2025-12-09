@@ -75,7 +75,7 @@ class FS:
         exists = self.exists(remotepath)
         if exists:
             _log.info("rename %s -> %s", remotepath, tmpfn)
-            self.sftp.rename(str(remotepath), str(tmpfn))
+            self.sftp.posix_rename(str(remotepath), str(tmpfn))
         _log.info("put %s", remotepath)
         self.sftp.putfo(fp, remotepath=str(remotepath), file_size=file_size)
         if exists:
@@ -88,7 +88,7 @@ class FS:
         _log.info("put %s", tmpfn)
         self.sftp.putfo(fp, remotepath=str(tmpfn), file_size=file_size)
         _log.info("rename %s -> %s", tmpfn, remotepath)
-        self.sftp.rename(str(tmpfn), str(remotepath))
+        self.sftp.posix_rename(str(tmpfn), str(remotepath))
 
     def put_safe4(self, fp, remotepath: Path, file_size: int = 0):
         # put-tmp1, rename-tmp2, rename, unlink
@@ -99,9 +99,9 @@ class FS:
         self.sftp.putfo(fp, remotepath=str(tmpfn1), file_size=file_size)
         if exists:
             _log.info("rename %s -> %s", remotepath, tmpfn2)
-            self.sftp.rename(str(remotepath), str(tmpfn2))
+            self.sftp.posix_rename(str(remotepath), str(tmpfn2))
         _log.info("rename %s -> %s", tmpfn1, remotepath)
-        self.sftp.rename(str(tmpfn1), str(remotepath))
+        self.sftp.posix_rename(str(tmpfn1), str(remotepath))
         if exists:
             _log.info("unlink %s", tmpfn2)
             self.sftp.unlink(str(tmpfn2))
