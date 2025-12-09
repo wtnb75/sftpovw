@@ -36,6 +36,8 @@ protect _new file_, _old file_, and _readers_
 1. put **localfile** to **tmpfile**
 2. rename **tmpfile** to **remotefile**
 
+actually rsync supports this level. so most people would use rsync for safe file transfer over ssh.
+
 ## safe level 4
 
 protect _new file_, _old file_, and _readers_
