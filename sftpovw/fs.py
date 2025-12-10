@@ -1,7 +1,8 @@
 from logging import getLogger
-from typing import Iterable
+from typing import Iterable, BinaryIO
 from pathlib import Path
 import os
+import time
 import tempfile
 import paramiko
 import shlex
@@ -16,13 +17,7 @@ _log = getLogger(__name__)
 class FS:
     HASH_ALGO = "sha1"  # normally "sha1" or "md5"
 
-    def __init__(
-        self,
-        host: str | None = None,
-        *,
-        client: paramiko.SSHClient | None = None,
-        **kwargs,
-    ):
+    def __init__(self, host: str | None = None, *, client: paramiko.SSHClient | None = None, **kwargs):
         getLogger("paramiko").setLevel("INFO")
         if host:
             conf = paramiko.SSHConfig().from_path(os.path.expanduser("~/.ssh/config"))
@@ -56,20 +51,22 @@ class FS:
     def list(self, path: Path):
         return self.sftp.listdir(str(path))
 
-    def put_safe0(self, fp, remotepath: Path, file_size: int = 0):
+    def put_safe0(self, fp: BinaryIO, remotepath: Path, file_size: int = 0):
         # put-overwrite
         _log.info("put %s", remotepath)
-        self.sftp.putfo(fl=fp, remotepath=str(remotepath), file_size=file_size)
+        attr = self.sftp.putfo(fl=fp, remotepath=str(remotepath), file_size=file_size)
+        return attr.st_size
 
-    def put_safe1(self, fp, remotepath: Path, file_size: int = 0):
+    def put_safe1(self, fp: BinaryIO, remotepath: Path, file_size: int = 0):
         # remove, put
         if self.exists(remotepath):
             _log.info("remove %s", remotepath)
             self.sftp.unlink(str(remotepath))
         _log.info("put %s", remotepath)
-        self.sftp.putfo(fl=fp, remotepath=str(remotepath), file_size=file_size)
+        attr = self.sftp.putfo(fl=fp, remotepath=str(remotepath), file_size=file_size)
+        return attr.st_size
 
-    def put_safe2(self, fp, remotepath: Path, file_size: int = 0) -> None:
+    def put_safe2(self, fp: BinaryIO, remotepath: Path, file_size: int = 0):
         # rename-tmp, put, delete-tmp
         tmpfn = self.tmpfile(remotepath)
         exists = self.exists(remotepath)
@@ -77,26 +74,28 @@ class FS:
             _log.info("rename %s -> %s", remotepath, tmpfn)
             self.sftp.posix_rename(str(remotepath), str(tmpfn))
         _log.info("put %s", remotepath)
-        self.sftp.putfo(fp, remotepath=str(remotepath), file_size=file_size)
+        attr = self.sftp.putfo(fp, remotepath=str(remotepath), file_size=file_size)
         if exists:
             _log.info("unlink %s", tmpfn)
             self.sftp.unlink(str(tmpfn))
+        return attr.st_size
 
-    def put_safe3(self, fp, remotepath: Path, file_size: int = 0):
+    def put_safe3(self, fp: BinaryIO, remotepath: Path, file_size: int = 0):
         # put-tmp, rename
         tmpfn = self.tmpfile(remotepath)
         _log.info("put %s", tmpfn)
-        self.sftp.putfo(fp, remotepath=str(tmpfn), file_size=file_size)
+        attr = self.sftp.putfo(fp, remotepath=str(tmpfn), file_size=file_size)
         _log.info("rename %s -> %s", tmpfn, remotepath)
         self.sftp.posix_rename(str(tmpfn), str(remotepath))
+        return attr.st_size
 
-    def put_safe4(self, fp, remotepath: Path, file_size: int = 0):
+    def put_safe4(self, fp: BinaryIO, remotepath: Path, file_size: int = 0):
         # put-tmp1, rename-tmp2, rename, unlink
         exists = self.exists(remotepath)
         tmpfn1 = self.tmpfile(remotepath)
         tmpfn2 = self.tmpfile(remotepath)
         _log.info("put %s", tmpfn1)
-        self.sftp.putfo(fp, remotepath=str(tmpfn1), file_size=file_size)
+        attr = self.sftp.putfo(fp, remotepath=str(tmpfn1), file_size=file_size)
         if exists:
             _log.info("rename %s -> %s", remotepath, tmpfn2)
             self.sftp.posix_rename(str(remotepath), str(tmpfn2))
@@ -105,11 +104,13 @@ class FS:
         if exists:
             _log.info("unlink %s", tmpfn2)
             self.sftp.unlink(str(tmpfn2))
+        return attr.st_size
 
     def get_safe0(self, remotepath: Path, localpath: Path):
         # get-overwrite
         _log.info("get %s -> %s", remotepath, localpath)
         self.sftp.get(remotepath=str(remotepath), localpath=localpath)
+        return localpath.stat().st_size
 
     def get_safe1(self, remotepath: Path, localpath: Path):
         # remove, get
@@ -118,6 +119,7 @@ class FS:
             os.unlink(localpath)
         _log.info("get %s -> %s", remotepath, localpath)
         self.sftp.get(remotepath=str(remotepath), localpath=localpath)
+        return localpath.stat().st_size
 
     def get_safe2(self, remotepath: Path, localpath: Path):
         # rename-tmp, get, delete-tmp
@@ -131,6 +133,7 @@ class FS:
         if exists:
             _log.info("unlink(local) %s -> %s", tmpfn)
             os.unlink(tmpfn)
+        return localpath.stat().st_size
 
     def get_safe3(self, remotepath: Path, localpath: Path):
         # get-tmp, rename
@@ -139,6 +142,7 @@ class FS:
         self.sftp.get(remotepath=str(remotepath), localpath=tmpfn)
         _log.info("rename(local) %s -> %s", tmpfn, localpath)
         os.rename(tmpfn, localpath)
+        return localpath.stat().st_size
 
     def get_safe4(self, remotepath: Path, localpath: Path):
         # get-tmp1, rename-tmp2, rename, unlink
@@ -155,12 +159,31 @@ class FS:
         if exists:
             _log.info("unlink(local) %s -> %s", tmpfn2)
             os.unlink(tmpfn2)
+        return localpath.stat().st_size
 
-    def put(self, fp, remotepath: Path, file_size: int = 0, level: int = 3):
-        return getattr(self, f"put_safe{level}")(fp, remotepath, file_size)
+    def put(self, fp: BinaryIO, remotepath: Path, file_size: int = 0, level: int = 3) -> int:
+        st = time.time()
+        try:
+            res = getattr(self, f"put_safe{level}")(fp, remotepath, file_size)
+            elapsed = time.time() - st
+            _log.info("put%d %d bytes in %.f second (%.f Bytes/s)", level, res, res / elapsed)
+            return res
+        except Exception:
+            elapsed = time.time() - st
+            _log.exception("put%d failed in %.f second", level, elapsed)
+            raise
 
-    def get(self, remotepath: Path, localpath: Path, level: int = 3):
-        return getattr(self, f"get_safe{level}")(remotepath, localpath)
+    def get(self, remotepath: Path, localpath: Path, level: int = 3) -> int:
+        st = time.time()
+        try:
+            res = getattr(self, f"get_safe{level}")(remotepath, localpath)
+            elapsed = time.time() - st
+            _log.info("get%d %d bytes in %.f second (%.f Bytes/s)", level, res, res / elapsed)
+            return res
+        except Exception:
+            elapsed = time.time() - st
+            _log.exception("get%d failed in %.f second", level, elapsed)
+            raise
 
     def hash(self, paths: Iterable[Path]) -> dict[str, str]:
         try:
@@ -184,9 +207,19 @@ class FS:
         stdin, stdout, stderr = self.client.exec_command(cmdstr)
         stdin.close()
         res = {}
-        for line in stdout.readlines():
+        stdout_str = stdout.read()
+        exit_code = stdout.channel.recv_exit_status()
+        if exit_code == 127:
+            raise ValueError(f"command not found: {stdout_str}")
+        for line in stdout_str.splitlines():
             val, fn = line.strip().split(maxsplit=1)
             res[fn] = val
+        if exit_code == 1:
+            _log.error("file not found? stderr=%s", stderr.read())
+        elif exit_code != 0:
+            _log.warning("unknown error(exit %s): stderr=%s", exit_code, stderr.read())
+            if not res:
+                raise Exception(f"unknown error({exit_code}): stderr={stderr.read()}")
         return res
 
     def exists(self, path: Path) -> bool:
