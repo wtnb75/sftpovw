@@ -1,17 +1,19 @@
-import unittest
-import tempfile
 import io
-from testcontainers.sftp import SFTPContainer
+import tempfile
+import unittest
 from pathlib import Path
+
+from testcontainers.sftp import SFTPContainer
+
 from sftpovw.fs import FS
 
 
 class TestFS(unittest.TestCase):
     def test_hash_local(self):
-        tf = tempfile.NamedTemporaryFile("r+b")
-        tf.write(b"hello world")
-        tf.flush()
-        res = FS.hash_local([Path(tf.name)])
+        with tempfile.NamedTemporaryFile("r+b") as tf:
+            tf.write(b"hello world")
+            tf.flush()
+            res = FS.hash_local([Path(tf.name)])
         self.assertEqual(["2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"], list(res.values()))
 
     def test_put_safeN(self):

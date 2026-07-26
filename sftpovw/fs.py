@@ -1,15 +1,19 @@
-from logging import getLogger
-from typing import Iterable, BinaryIO
-from pathlib import Path
-import os
-import time
-import tempfile
-import paramiko
-import shlex
+from __future__ import annotations
+
 import glob
-import secrets
 import hashlib
+import os
+import secrets
+import shlex
 import stat
+import tempfile
+import time
+from collections.abc import Iterable
+from logging import getLogger
+from pathlib import Path
+from typing import BinaryIO
+
+import paramiko
 
 _log = getLogger(__name__)
 
@@ -198,7 +202,7 @@ class FS:
                 with self.sftp.file(str(path)) as fp:
                     res[path] = fp.check(self.HASH_ALGO).hex()
             return res
-        except IOError:
+        except OSError:
             return self.hash_bycmd(paths)
 
     def hash_bycmd(self, paths: Iterable[Path]) -> dict[str, str]:
@@ -219,7 +223,7 @@ class FS:
         elif exit_code != 0:
             _log.warning("unknown error(exit %s): stderr=%s", exit_code, stderr.read())
             if not res:
-                raise Exception(f"unknown error({exit_code}): stderr={stderr.read()}")
+                raise RuntimeError(f"unknown error({exit_code}): stderr={stderr.read()}")
         return res
 
     def exists(self, path: Path) -> bool:
@@ -244,7 +248,7 @@ class FS:
             name = path.with_suffix(path.suffix + "." + suffix)
             if not self.exists(name):
                 return name
-        raise Exception("cannot create tmpfile?")
+        raise RuntimeError("cannot create tmpfile?")
 
     def listtmp(self, path: Path) -> list[Path]:
         name = self.tmpfile(path)
