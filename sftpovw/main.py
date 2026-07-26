@@ -1,10 +1,12 @@
-import click
 import functools
-import paramiko
-import os
 import json
+import os
 from logging import getLogger
 from pathlib import Path
+
+import click
+import paramiko
+
 from .fs import FS
 from .version import VERSION
 

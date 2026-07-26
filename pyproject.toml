@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sftpovw"
+dynamic = ["version"]
+description = "write safer, sftp"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Watanabe Takashi", email = "wtnb75@gmail.com" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: System :: Networking",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "paramiko",
+    "click",
+]
+
+[project.urls]
+Homepage = "https://github.com/wtnb75/sftpovw"
+
+[project.scripts]
+sftpovw = "sftpovw.main:cli"
+
+[tool.hatch.version]
+path = "sftpovw/version.py"
+pattern = "VERSION = ['\"](?P<version>[^'\"]+)['\"]"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sftpovw"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-github-actions-annotate-failures",
+    "ruff",
+    "pdoc",
+    "testcontainers",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+python_files = ["test_*.py"]
+addopts = "--cov-report=html:cover --cov-report=term --cov-branch --cov-reset --cov=sftpovw --doctest-modules"
+
+[tool.ruff]
+line-length = 120
