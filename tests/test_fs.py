@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from testcontainers.sftp import SFTPContainer
+from testcontainers.community.sftp import SFTPContainer
 
 from sftpovw.fs import FS
 
